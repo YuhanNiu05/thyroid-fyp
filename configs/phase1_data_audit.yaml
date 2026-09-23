@@ -1,0 +1,24 @@
+# Documentation-only record of the phase-1 audit defaults.
+# scripts/check_tn5000.py currently receives these values via CLI arguments.
+project:
+  question: "Does full image plus manual ROI outperform full image only on TN5000?"
+  planned_model: "Qwen/Qwen3-VL-4B-Instruct"
+  phase: "environment_and_data_audit"
+
+data:
+  root: "data/official/TN5000_forReview"
+  format: "Pascal VOC-compatible XML plus JPEG"
+  official_splits:
+    train: 3500
+    val: 500
+    test: 1000
+
+audit:
+  seed: 20260923
+  preview_count: 20
+  output_example: "outputs/phase1_audit"
+  modify_source_data: false
+
+training:
+  enabled: false
+  model_download_enabled: false

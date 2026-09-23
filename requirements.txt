@@ -1,0 +1,3 @@
+# Minimal dependencies for phase-1 data auditing only.
+numpy==2.3.2
+Pillow==11.3.0

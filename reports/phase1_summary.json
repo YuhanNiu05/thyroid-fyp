@@ -1,0 +1,53 @@
+{
+  "status": "AutoDL 实际运行成功",
+  "dataset": "TN5000",
+  "official_git_commit": "ddc1ab40ce9fd8b8d7f7c7df920897686822b4c6",
+  "seed": 20260923,
+  "images": 5000,
+  "annotations": 5000,
+  "objects": 5000,
+  "class_meaning": {
+    "0": "benign",
+    "1": "malignant"
+  },
+  "class_counts": {
+    "0": 1426,
+    "1": 3574
+  },
+  "paper_class_counts": {
+    "0": 1428,
+    "1": 3572
+  },
+  "splits": {
+    "train": {"total": 3500, "0": 1032, "1": 2468},
+    "val": {"total": 500, "0": 125, "1": 375},
+    "test": {"total": 1000, "0": 269, "1": 731}
+  },
+  "missing_images": 0,
+  "missing_annotations": 0,
+  "corrupt_images": 0,
+  "unknown_labels": 0,
+  "nonpositive_boxes": 0,
+  "converted_out_of_bounds_boxes": 0,
+  "xml_image_size_mismatches": ["002589", "004092"],
+  "raw_coordinate_boundary_questions": ["003813"],
+  "exact_duplicate_groups": 119,
+  "duplicate_sample_ids": 245,
+  "duplicate_excess_images": 126,
+  "cross_split_duplicate_groups": 65,
+  "cross_split_groups_by_pair": {
+    "train_val": 23,
+    "train_test": 39,
+    "val_test": 3
+  },
+  "patient_id": "目前没有足够信息确认；发布文件未提供",
+  "nodule_id": "目前没有足够信息确认；发布文件未提供",
+  "near_duplicate_check": "尚未验证",
+  "preview_count": 20,
+  "preview_generated": true,
+  "preview_pixel_verification": "passed",
+  "preview_committed_to_git": false,
+  "source_data_modified": false,
+  "model_downloaded": false,
+  "training_started": false
+}
