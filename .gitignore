@@ -106,3 +106,6 @@ Thumbs.db
 *.log
 core
 core.*
+
+# Local recoverable history, never part of a clone
+/.archive/

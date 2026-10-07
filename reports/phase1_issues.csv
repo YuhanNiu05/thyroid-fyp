@@ -1,7 +1,0 @@
-issue_type,sample_id,split,observed,action
-xml_image_size_mismatch,002589,train,"XML 818x628; JPEG 718x500","Recorded only; source unchanged"
-xml_image_size_mismatch,004092,test,"XML 677x432; JPEG 718x500","Recorded only; source unchanged"
-raw_coordinate_boundary_question,003813,train,"JPEG width 718; raw xmax 719; official converted xmax 718","Recorded only; source unchanged"
-paper_class_count_mismatch,,all,"XML 0=1426 and 1=3574; paper 0=1428 and 1=3572","Cannot identify affected samples from aggregate counts"
-cross_split_exact_duplicates,,all,"65 exact duplicate groups cross official splits","See reports/duplicate_groups.md; no files removed"
-missing_patient_and_nodule_ids,,all,"No patient/nodule mapping in released files","Insufficient information to verify group isolation"

@@ -1,0 +1,103 @@
+{
+  "status": "AutoDL 实际运行成功",
+  "scope": "TN5000 full-image versus manual-ROI classification; fixed deduplicated validation only",
+  "model": {
+    "id": "Qwen/Qwen3-VL-4B-Instruct",
+    "adapter": "checkpoint-epoch-2",
+    "adapter_sha256": "e7541083da9725aa988408e431497007ce4e438117f8708c42d44a0f3a38b71c",
+    "generation": {
+      "max_new_tokens": 24,
+      "do_sample": false
+    }
+  },
+  "data_audit": {
+    "images": 5000,
+    "exact_duplicate_groups": 119,
+    "cross_split_duplicate_groups": 65,
+    "anomaly_ids": {
+      "002589": "train XML/JPEG size mismatch; excluded",
+      "003813": "train raw xmax exceeds image width by one; excluded",
+      "004092": "test XML/JPEG size mismatch; excluded from frozen primary test"
+    }
+  },
+  "cohorts": {
+    "train": {
+      "count": 3384,
+      "benign": 999,
+      "malignant": 2385
+    },
+    "validation": {
+      "count": 496,
+      "benign": 123,
+      "malignant": 373
+    },
+    "frozen_primary_test_metadata_only": {
+      "count": 991,
+      "benign": 268,
+      "malignant": 723,
+      "inference_run": false
+    }
+  },
+  "metrics": {
+    "V1_full_image": {
+      "accuracy": 0.8528225806451613,
+      "macro_f1": 0.7999458536612318,
+      "malignant_sensitivity": 0.9088471849865952,
+      "benign_specificity": 0.6829268292682927,
+      "confusion_matrix": [
+        [
+          84,
+          39,
+          0
+        ],
+        [
+          34,
+          339,
+          0
+        ]
+      ]
+    },
+    "O1_full_image_plus_original_roi": {
+      "accuracy": 0.8387096774193549,
+      "macro_f1": 0.7749546279491832,
+      "malignant_sensitivity": 0.9115281501340483,
+      "benign_specificity": 0.6178861788617886,
+      "transitions_vs_V1": {
+        "wrong_to_correct": 10,
+        "correct_to_wrong": 17,
+        "correct_to_correct": 406,
+        "wrong_to_wrong": 63
+      }
+    },
+    "D1_full_image_plus_duplicate_full_image": {
+      "accuracy": 0.8024193548387096,
+      "macro_f1": 0.7582557491843718,
+      "malignant_sensitivity": 0.8176943699731903,
+      "benign_specificity": 0.7560975609756098,
+      "transitions_vs_V1": {
+        "wrong_to_correct": 11,
+        "correct_to_wrong": 36,
+        "correct_to_correct": 387,
+        "wrong_to_wrong": 62
+      }
+    },
+    "R10_full_image_plus_expanded_roi": {
+      "accuracy": 0.8366935483870968,
+      "macro_f1": 0.7728205737162632,
+      "malignant_sensitivity": 0.9088471849865952,
+      "benign_specificity": 0.6178861788617886,
+      "transitions_vs_V1": {
+        "wrong_to_correct": 8,
+        "correct_to_wrong": 16,
+        "correct_to_correct": 407,
+        "wrong_to_wrong": 65
+      },
+      "boundary_clipped_cases": 6
+    }
+  },
+  "limitations": [
+    "Checkpoint selection and all comparisons use the same fixed validation set.",
+    "No test inference, repeated-seed study, ROI-specific training, or patient-level isolation verification was run.",
+    "All ROI variants showed no net validation benefit over V1."
+  ]
+}
