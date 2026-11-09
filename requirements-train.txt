@@ -1,0 +1,7 @@
+# Install a CUDA-compatible PyTorch build separately before using these packages.
+-r requirements.txt
+matplotlib==3.10.5
+transformers==5.17.0
+accelerate==1.15.0
+peft==0.21.0
+qwen-vl-utils==0.0.14

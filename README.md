@@ -1,73 +1,62 @@
-# TN5000：整图与人工 ROI 分类对照
+# Thyroid FYP：整图与人工 ROI 的甲状腺超声分类
 
-本项目考察：向视觉语言模型额外提供人工标注 ROI，是否优于只提供整图完成甲状腺超声良恶性分类。
+本项目基于 **TN5000** 与 **Qwen3-VL-4B-Instruct + LoRA**，研究人工标注的结节 ROI 是否能改善甲状腺超声良恶性分类，并探索基于模型置信度的选择性复核（Needs Review）。
 
-截至 2026-10-07，所有完成工作、结果与限制均汇总在本文件。原始 TN5000 图像、XML、模型权重、模型缓存和逐图运行产物均不进入 Git。
+当前仓库包含数据审计、V1/V2/V3 训练、验证集评估和 Verify 分析代码，以及不含原始医学图像的聚合结果。**原始 TN5000 数据、逐例预测、模型权重和缓存均不进入 Git。**
 
-## 当前结论
+## 研究问题
 
-固定 `Qwen/Qwen3-VL-4B-Instruct` 全量训练最佳 `checkpoint-epoch-2`，在去重且结构有效的固定 validation 集（496 张：良性 123、恶性 373）上：
+- **V1 — Whole-only：** 仅输入整张超声图像。
+- **V2 — ROI-only：** 训练和推理均仅输入人工标注框裁剪的 ROI。
+- **V3 — Whole + ROI：** 按固定顺序同时输入整图和对应 ROI。
+- **Verify：** 不重新训练模型，根据 V1/V2 的预测和置信度决定是否进入人工复核。
 
-| 输入 | Accuracy | Macro-F1 | 恶性敏感度 | 良性特异度 | 相对整图净正确数 |
-|---|---:|---:|---:|---:|---:|
-| V1：整图 | 85.28% | 0.79995 | 90.88% | 68.29% | 0 |
-| O1：整图 + 原始人工 ROI | 83.87% | 0.77495 | 91.15% | 61.79% | -7 |
-| D1：整图 + 同一张整图 | 80.24% | 0.75826 | 81.77% | 75.61% | -25 |
-| R10：整图 + 每侧 10% 扩边 ROI | 83.67% | 0.77282 | 90.88% | 61.79% | -8 |
+## 核心结果
 
-O1 纠正 10 例、改坏 17 例；没有观察到净收益。R10 纠正 8 例、改坏 16 例；扩边没有恢复 V1 表现。D1 说明重复提供同一整图本身也会改变模型输出，不能把 O1/R10 的变化完全归因于 ROI 像素。
+所有数字均来自同一固定、去重且结构有效的 validation 集：496 张图像，其中良性 123、恶性 373。三组模型使用相同训练划分、随机种子 `20260923` 和 LoRA 参数；V2/V3 均从原始基座独立微调 5 epoch，并按 validation Macro-F1 选择最佳 checkpoint。LoRA 设置为 `r=4`、`alpha=8`、`dropout=0`，目标模块为 `q_proj`/`v_proj`；AdamW 学习率 `1e-4`，microbatch 1、梯度累积 2。
 
-这些都是同一个固定开发集上的描述性结果。checkpoint 由此 val 选择，不能当作最终泛化结论；test 尚未运行。没有患者或结节 ID，患者级独立性无法确认。
+| 模型 | 输入 | Accuracy | Macro-F1 | 良性 Recall | 恶性 Recall | 相比 V1 纠正 / 新增错误 |
+|---|---|---:|---:|---:|---:|---:|
+| V1 | Whole-only | 85.28% | 0.800 | 68.29% | 90.88% | — |
+| V2 | ROI-only | 88.91% | 0.853 | 79.67% | 91.96% | 48 / 30 |
+| V3 | Whole + ROI | **89.72%** | **0.862** | 78.86% | **93.30%** | 42 / 20 |
 
-## 已实际完成的工作
+![V1、V2、V3 混淆矩阵](docs/figures/model_confusion_matrices.png)
 
-### 数据与环境审计
+在当前 validation 上，针对 ROI 训练后，V2 和 V3 均超过 V1；V3 表现最高。但这些结果只有一个随机种子，且 checkpoint 也由同一 validation 选择，因此不能视为独立泛化证明，也不能单凭 V3 更高就断言模型确实学会了两种视图的互补信息。
 
-- AutoDL：RTX 4090 D，24,564 MiB；Python 3.12.3；PyTorch 2.8.0+cu128。
-- 全量检查 5,000 张 JPEG 和 XML：每张有一个已知标签对象，均可解码。
-- XML `0=benign`、`1=malignant`；框为 `xmin, ymin, xmax, ymax`。
-- ROI 坐标使用官方加载器规则：四个坐标均减 1，作为 Pillow 半开区间；不 padding、不夹紧、不修改原始文件。
-- 119 个精确重复组，65 组跨官方 train/val/test。因此实验使用文件 SHA256 或解码 RGB SHA256 的连通重复组隔离，优先级 `test > val > train`。
-- 已发现但未修复：`002589`（train，XML/JPEG 尺寸不一致）、`003813`（train，原始 xmax 超界 1 像素）、`004092`（test，XML/JPEG 尺寸不一致）。
+### Verify 探索
 
-官方图像级统计为 train 3,500、val 500、test 1,000。去重及结构检查后，本项目的 train 为 3,384（良性 999、恶性 2,385），固定 val 为 496（良性 123、恶性 373）。3,384 已经排除了 `002589` 和 `003813`，不能再次相减。
+V1/V2 逐例关系为：都正确 393 例、仅 V1 正确 30 例、仅 V2 正确 48 例、都错误 25 例；两模型预测不一致 78 例。
 
-### 全量 V1 训练
+在共同可比较的 Coverage 区间 `0–418/496`（84.27%）内：
 
-基础模型为 `Qwen/Qwen3-VL-4B-Instruct`。LoRA：`r=4`、alpha=8、dropout=0、目标 `q_proj`/`v_proj`；AdamW，学习率 `1e-4`；自然类别比例，microbatch 1、梯度累积 2。
+| 策略 | 共同归一化 AURC ↓ | 说明 |
+|---|---:|---|
+| B-V1 | 0.06819 | 按 V1 置信度复核 |
+| B-V2 | 0.01397 | 按 V2 置信度复核 |
+| C | 0.01863 | 分歧或最低置信度不足时复核 |
+| D，λ=0.05 | **0.01200** | `V2 confidence − λ × disagreement` |
 
-全量 train 实际完成 5 epoch、8,460 optimizer steps。按固定 val Macro-F1 早停，最佳为 epoch 2：Accuracy 0.852823、Macro-F1 0.799946，混淆矩阵 `[[84,39,0],[34,339,0]]`（行是真实 benign/malignant，列是预测 benign/malignant/parse_failed）。保留的 adapter SHA256：`e7541083da9725aa988408e431497007ce4e438117f8708c42d44a0f3a38b71c`。
+![Verify Risk–Coverage 曲线](docs/figures/verify_risk_coverage.png)
 
-### ROI 对照与诊断
+D 在平均排序指标上优于 B-V2，但在约 60% / 70% / 80% Coverage 时，风险相对 B-V2 分别为持平 / 更低 / 更高，并没有稳定支配 B-V2。当前证据不足以支持仅为 D 增加完整 V1 推理成本。真实标签只用于离线评价，从未作为单样本复核决策输入。
 
-所有 496 张固定 val 均使用同一 adapter、处理器、生成参数（`max_new_tokens=24`、`do_sample=false`）和解析规则。提示词不含真实标签、文件名、第一次回答或人工审计面板。O1、D1、R10 都将第二张图实际送入视觉编码器；整图第一张的张量与 V1 一致。
+完整聚合结果见 [`results.json`](results.json)。
 
-- O1：原始无 padding ROI。平均视觉 token 443.26，相对 V1 的 371.87 增加 19.2%；排除六例启动检查后平均单例耗时 160.42 ms，相对 V1 144.81 ms 增加 10.8%。
-- D1：第二张为同一整图的像素完全相同副本。平均视觉 token 743.75；平均单例耗时 201.92 ms，相对同步复跑 V1 的 143.44 ms 增加 40.8%。
-- R10：每侧扩展原框对应宽/高的 10%，左上向下取整、右下向上取整，再截到图像边界；其余 490 例未触边，6 例触边坐标保存在本地结果。平均视觉 token 447.69；平均单例耗时 159.64 ms，增加 11.3%。
+## 数据与划分
 
-三组均无解析失败、文本/视觉输入截断或输出长度截断。O1 的全部 27 个变化案例已做事后整理；其中出现的测量端点或界面标记只作描述，未用来改标注，也不能证明其导致预测变化。
+官方 TN5000 包含 5,000 张 JPEG/XML。项目审计发现 119 个精确重复组，其中 65 组跨官方 train/val/test。实验通过文件或解码像素 SHA256 连通组隔离重复样本，优先级为 `test > val > train`。
 
-## 冻结的最终测试规则
+最终开发数据：
 
-最终 test 尚未运行。届时 V1 与 ROI 两臂使用同一去重、结构有效清单；解析失败保留并计错。`004092` 从两臂主 test 同时排除：它的 XML 为 677x432，而 JPEG 为 718x500；虽转换后框在图像内，仍不能证明标注和图像对齐。不得缩放、夹紧或修复该框。冻结后的主 test 元数据清单为 991 张（良性 268、恶性 723）。
+- train：3,384 张（良性 999、恶性 2,385）
+- validation：496 张（良性 123、恶性 373）
+- test：未用于训练、调参、模型选择或推理；仅在数据审计阶段读取元数据/哈希，并冻结结构异常排除规则
 
-## 精简后的本地输出
+已记录但未原地修复的异常样本：`002589`、`003813`、`004092`。ROI 使用官方加载器规则：XML 四个坐标均减 1，再作为 Pillow 半开区间裁剪；不 padding、不夹紧、不修改原始文件。
 
-`outputs/` 被 Git 忽略，仅保留后续工作有用的本地文件：
-
-```text
-outputs/
-├── model_cache/             # Qwen 本地缓存；保留，换同一磁盘/GPU 不必重下
-├── checkpoint-epoch-2/      # 选定 LoRA adapter；不提交 Git
-└── final_val496/            # 配置、指标、逐例原始回答、O1 复核和扩边坐标
-```
-
-换到新实例通常需要重新下载模型；若携带 `outputs/model_cache/` 或挂载持久盘则可直接复用。逐图 PNG、早期冒烟、32 图拟合、256 图开发试验、非最佳 checkpoints、模型缓存以外的中间训练输出均已删除。
-
-## 使用
-
-数据不随仓库分发。下载后应放在：
+数据不随仓库分发。请自行取得 TN5000，并放置为：
 
 ```text
 data/official/TN5000_forReview/
@@ -76,28 +65,106 @@ data/official/TN5000_forReview/
 └── ImageSets/Main/{train,val,test,trainval}.txt
 ```
 
-安装最小审计依赖：
+使用数据前请确认并遵守 TN5000 的官方许可和使用条件。
+
+## 环境
+
+实际运行环境：Python 3.12.3、PyTorch 2.8.0+cu128、CUDA 12.8、RTX 4090 D。
+
+数据审计的最小依赖：
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
-python scripts/check_environment.py
-python scripts/check_tn5000.py --data-root data/official/TN5000_forReview --output outputs/phase1_audit --seed 20260923 --preview-count 20
 ```
 
-`scripts/fetch_official.py` 可按官方元数据下载数据和基准代码；使用前请自行确认数据许可与磁盘空间。当前仓库只保留数据下载、环境检查和全量数据审计脚本。模型训练和诊断的完成记录、精简结果和已选 checkpoint 在本地 `outputs/` 中，模型权重与数据都不进入 Git。
+训练和 Verify 依赖：
 
-## 项目目录
+```bash
+# 先按本机 CUDA 安装合适的 PyTorch；原实验使用 torch 2.8.0+cu128
+python -m pip install -r requirements-train.txt
+```
+
+## 主要流程
+
+### 1. 数据审计
+
+```bash
+python scripts/check_environment.py
+python scripts/check_tn5000.py \
+  --data-root data/official/TN5000_forReview \
+  --output outputs/phase1_audit \
+  --seed 20260923 \
+  --preview-count 20
+```
+
+### 2. V2/V3 专项训练
+
+训练脚本要求本地已有 Qwen3-VL 基座缓存，默认位置为 `outputs/model_cache/`。
+
+```bash
+python scripts/phase3_train_roi.py \
+  --mode v2 \
+  --run-name phase3_v2_roi_only_seed20260923
+
+python scripts/phase3_train_roi.py \
+  --mode v3 \
+  --run-name phase3_v3_whole_roi_seed20260923_run2
+
+python scripts/summarize_phase3_roi.py \
+  --v2-run outputs/phase3_v2_roi_only_seed20260923 \
+  --v3-run outputs/phase3_v3_whole_roi_seed20260923_run2
+```
+
+### 3. Verify 分析
+
+第一轮需要 V1/V2 已训练 checkpoint 和保存的 validation 结果；第二轮只读取第一轮 CSV，不加载模型或图像。
+
+```bash
+python scripts/phase4_verify.py --run-name phase4_verify_val496
+python scripts/phase4_verify_round2.py --run-name phase4_verify_round2_val496
+python scripts/generate_verify_report_docx.py
+```
+
+所有运行产物写入被 Git 忽略的 `outputs/`。脚本中的固定路径与原实验目录保持一致，迁移环境时应先恢复数据、基座模型缓存和相应 LoRA checkpoint。
+
+## 仓库结构
 
 ```text
 .
-├── README.md                # 唯一人类可读报告
-├── results.json             # 关键机器可读结果
-├── requirements.txt
-├── evidence/                # 官方数据及源码定位元数据
-├── scripts/                 # 下载、环境检查、数据审计
-└── outputs/                 # 本地忽略：缓存、最佳 adapter、精简结果
+├── README.md
+├── results.json                  # 不含逐例信息的机器可读聚合结果
+├── requirements.txt             # 数据审计最小依赖
+├── requirements-train.txt       # 训练、评估和绘图依赖（PyTorch 单独安装）
+├── evidence/                    # 官方数据和源码版本元数据
+├── docs/figures/                # 可公开的聚合结果图
+├── scripts/
+│   ├── check_tn5000.py          # 数据完整性、重复和结构审计
+│   ├── phase2_train_full.py     # V1 全量训练
+│   ├── phase3_train_roi.py      # V2/V3 训练
+│   ├── summarize_phase3_roi.py  # 三模型比较
+│   ├── phase4_verify.py         # Verify 第一轮与候选评分
+│   ├── phase4_verify_round2.py  # AURC、策略 D 和错误分析
+│   └── generate_verify_report_docx.py
+└── outputs/                     # 本地忽略：权重、缓存和逐例运行结果
 ```
 
-没有新增训练、test 推理、重复 seed 或其他 ROI 比例搜索。
+## 不进入 Git 的内容
+
+`.gitignore` 明确排除：
+
+- TN5000 原始图像、XML、下载压缩包和数据派生预览
+- Qwen3-VL 基座模型、LoRA 权重、checkpoint 和模型缓存
+- 逐例预测、sample-level CSV/JSON、训练日志及其他 `outputs/` 产物
+- 本机环境、认证信息、密钥与临时文件
+
+因此，克隆仓库可以获得核心代码、配置说明和聚合结果，但不能直接恢复模型权重或原始医学数据。
+
+## 限制
+
+- 所有已报告模型比较和 Verify 参数探索均基于同一个 validation 集。
+- 只有一个随机种子，没有患者或结节 ID，无法确认患者级独立性。
+- V1/V2 的两候选置信度未经跨模型校准。
+- 尚未进行 test 推理或指标评价；最终规则必须在首次 test 评价前冻结。
+- 本项目是研究性实验，不构成临床诊断系统或医疗建议。

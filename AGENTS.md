@@ -2,13 +2,14 @@
 
 ## Project scope
 
-This repository studies whether adding a manually annotated TN5000 ROI to the full ultrasound image improves benign/malignant classification over using the full image alone. Phase 1 contains environment and data auditing only.
+This repository studies whole-image, manual-ROI-only, and whole-plus-ROI thyroid ultrasound classification on TN5000, followed by validation-only selective-review exploration.
 
 ## Current truth
 
-- `docs/phase1_report.md` is the public, human-readable phase-1 record.
-- `reports/phase1_summary.json` is the public machine-readable summary.
-- Local raw runs under `reports/tn5000_seed*/` are evidence artifacts and are intentionally ignored.
+- `README.md` is the public human-readable project record.
+- `results.json` is the public machine-readable aggregate summary.
+- `docs/figures/` contains aggregate plots only; sample-level artifacts remain ignored.
+- Local runs under `outputs/` and original data under `data/` are intentionally ignored.
 - The official paper defines XML label `0` as benign and `1` as malignant, and boxes as `xmin, ymin, xmax, ymax`.
 
 ## Safety rules
